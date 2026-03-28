@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "StudySession": {
+      "title": "StudySession",
+      "description": "A recorded study session.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who recorded the session."
+        },
+        "duration": {
+          "type": "number",
+          "description": "The duration of the session in seconds."
+        },
+        "date": {
+          "type": "string",
+          "description": "The date of the session in YYYY-MM-DD format."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the session was recorded."
+        },
+        "subject": {
+          "type": "string",
+          "description": "The subject being studied."
+        },
+        "topic": {
+          "type": "string",
+          "description": "The specific topic or part of the subject."
+        }
+      },
+      "required": ["userId", "duration", "date", "createdAt", "subject", "topic"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A study task.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "title", "completed", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/study_sessions/{sessionId}": {
+      "schema": {
+        "$ref": "#/entities/StudySession"
+      },
+      "description": "A collection of all recorded study sessions."
+    },
+    "/tasks/{taskId}": {
+      "schema": {
+        "$ref": "#/entities/Task"
+      },
+      "description": "A collection of user tasks."
+    }
+  }
+}

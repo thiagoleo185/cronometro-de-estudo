@@ -1,0 +1,160 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: study_sessions
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required) - The ID of the user who recorded the session
+    //   - duration: number (required, > 0) - The duration of the session in seconds
+    //   - date: string (required, YYYY-MM-DD) - The date of the session
+    //   - createdAt: timestamp (required) - The timestamp when the session was recorded
+    //   - subject: string (required) - The subject being studied
+    //   - topic: string (required) - The specific topic or part of the subject
+    //
+    // Collection: tasks
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required)
+    //   - title: string (required)
+    //   - completed: boolean (required)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    
+    function uidUnchanged() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId;
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+    
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+    
+    function isPositive(field) {
+      return request.resource.data[field] is number && request.resource.data[field] > 0;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    
+    function isValidStudySession(data) {
+      return hasOnlyAllowedFields(['userId', 'duration', 'date', 'createdAt', 'subject', 'topic', 'correctAnswers', 'wrongAnswers']) &&
+             data.userId is string && data.userId.size() > 0 &&
+             data.duration is number && data.duration > 0 &&
+             isValidDateString(data.date) &&
+             data.createdAt is timestamp &&
+             data.subject is string && data.subject.size() <= 100 &&
+             data.topic is string && data.topic.size() <= 100 &&
+             (!('correctAnswers' in data) || (data.correctAnswers is number && data.correctAnswers >= 0)) &&
+             (!('wrongAnswers' in data) || (data.wrongAnswers is number && data.wrongAnswers >= 0));
+    }
+
+    function isValidTask(data) {
+      return hasOnlyAllowedFields(['userId', 'title', 'completed', 'createdAt']) &&
+             data.userId is string && data.userId.size() > 0 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.completed is bool &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidContentItem(data) {
+      return hasOnlyAllowedFields(['userId', 'subject', 'title', 'completed', 'createdAt']) &&
+             data.userId is string && data.userId.size() > 0 &&
+             data.subject is string && data.subject.size() > 0 && data.subject.size() <= 100 &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.completed is bool &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /study_sessions/{sessionId} {
+      // Users can only read their own sessions
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Users can create sessions for themselves
+      allow create: if isAuthenticated() && 
+                    hasRequiredFields(['userId', 'duration', 'date', 'createdAt', 'subject', 'topic']) &&
+                    isValidStudySession(request.resource.data) && 
+                    uidUnchanged();
+                    
+      // Users can update their own sessions (though typically they just create them)
+      allow update: if isDocOwner() && 
+                    hasRequiredFields(['userId', 'duration', 'date', 'createdAt', 'subject', 'topic']) &&
+                    isValidStudySession(request.resource.data) && 
+                    uidNotModified() &&
+                    request.resource.data.createdAt == resource.data.createdAt; // createdAt is immutable
+                    
+      // Users can delete their own sessions
+      allow delete: if isDocOwner();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isAuthenticated() && 
+                    hasRequiredFields(['userId', 'title', 'completed', 'createdAt']) &&
+                    isValidTask(request.resource.data) && 
+                    uidUnchanged();
+                    
+      allow update: if isDocOwner() && 
+                    hasRequiredFields(['userId', 'title', 'completed', 'createdAt']) &&
+                    isValidTask(request.resource.data) && 
+                    uidNotModified() &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+                    
+      allow delete: if isDocOwner();
+    }
+
+    match /content_items/{itemId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isAuthenticated() && 
+                    hasRequiredFields(['userId', 'subject', 'title', 'completed', 'createdAt']) &&
+                    isValidContentItem(request.resource.data) && 
+                    uidUnchanged();
+                    
+      allow update: if isDocOwner() && 
+                    hasRequiredFields(['userId', 'subject', 'title', 'completed', 'createdAt']) &&
+                    isValidContentItem(request.resource.data) && 
+                    uidNotModified() &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+                    
+      allow delete: if isDocOwner();
+    }
+  }
+}

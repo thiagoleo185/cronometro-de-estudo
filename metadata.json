@@ -1,0 +1,5 @@
+{
+  "name": "StudyFlow Timer",
+  "description": "A modern study timer with a GitHub-style heatmap and Picture-in-Picture support.",
+  "requestFramePermissions": []
+}
